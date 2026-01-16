@@ -1,0 +1,121 @@
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <fstream>
+#include "../include/endereco.h"    
+#include "../include/palavra.h"     
+#include "../include/consulta.h"    
+#include "../include/logradouro.h"    
+
+using namespace std;
+
+int main(int argc, char *argv[]){
+
+    Endereco enderecos;
+    int num_enderecos;
+    
+    if (!(cin >> num_enderecos)) return 0; 
+    string lixo;
+    getline(cin, lixo); 
+    
+    string idEnd, idLogStr, tipoLog, nomeLog, numStr, bairro, regiao, cep, latStr, longStr;
+
+    for(int i=0; i < num_enderecos; i++){
+        getline(cin, idEnd, ';');
+        getline(cin, idLogStr, ';');
+        getline(cin, tipoLog, ';');
+        getline(cin, nomeLog, ';');
+        getline(cin, numStr, ';');
+        getline(cin, bairro, ';');
+        getline(cin, regiao, ';');
+        getline(cin, cep, ';');
+        getline(cin, latStr, ';');
+        getline(cin, longStr); 
+        
+        if(!idEnd.empty()) { 
+            try {
+                enderecos.adicionarEndereco(
+                    idEnd, stoi(idLogStr), tipoLog, nomeLog, stoi(numStr), 
+                    bairro, regiao, cep, stod(latStr), stod(longStr)
+                );
+            } catch (...) {
+            }
+        }
+    }
+    enderecos.ordenarPorID();
+   
+    Logradouro* logradouros = enderecos.gerarLogradourosUnicos();
+    Dicionario* palavras = new Dicionario(); 
+
+    ListLogradouros* atual = logradouros->getPrimeiro();
+
+    while(atual != nullptr) {
+        
+        stringstream ss(atual->nomeLogradouro); 
+        string palavra;
+        while(ss >> palavra){
+            palavras->insere(palavra, atual); 
+        }
+        atual = atual->proximo;
+    }
+
+    int num_consultas, num_resultados;
+    cin >> num_consultas >> num_resultados;
+    getline(cin, lixo);
+    
+    Consulta* todasAsConsultas = new Consulta[num_consultas];
+    string* idsConsultas = new string[num_consultas]; // Auxiliar para guardar IDs
+
+    string id_consulta, logradouro_consulta, lat_consulta, long_consulta;
+
+    for(int i=0; i < num_consultas; i++){
+        Consulta* novaConsulta = &todasAsConsultas[i];
+        
+        getline(cin, id_consulta, ';');
+        getline(cin, logradouro_consulta, ';');
+        getline(cin, lat_consulta, ';');
+        getline(cin, long_consulta); 
+
+        idsConsultas[i] = id_consulta;
+
+        stringstream ss(logradouro_consulta);
+        string palavra;
+        bool primeiraPalavra = true;
+
+        //REALIZAÇÃO DA BUSCA
+        while(ss >> palavra){
+        
+            ListaInvertida* resultadoBusca = palavras->buscar(palavra);
+            
+            if (primeiraPalavra) {
+                novaConsulta->iniciarBusca(resultadoBusca);
+                primeiraPalavra = false;
+            } else {
+                novaConsulta->intersectar(resultadoBusca);
+            }
+        }
+
+        double latOrigem = 0.0, longOrigem = 0.0;
+        try {
+            latOrigem = stod(lat_consulta);
+            longOrigem = stod(long_consulta);
+        } catch (...) {}
+        
+        // Ordena e limita os resultados
+        novaConsulta->processarResultados(latOrigem, longOrigem, num_resultados);
+    }
+
+    //IMPRESSaO DOS RESULTADOS
+    for(int i = 0; i < num_consultas; i++){
+        cout << idsConsultas[i] << ";";
+        todasAsConsultas[i].imprimirResultados(num_resultados);
+    }
+
+    //LIMPEZA DE MEMÓRIA
+    delete[] todasAsConsultas;//Chama o destrutor de cada Consulta
+    delete[] idsConsultas;
+    delete palavras;// Limpa a árvore e as listas invertidas
+    delete logradouros;//Limpa os nos de ListLogradouros reais
+
+    return 0;
+}
